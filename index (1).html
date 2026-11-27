@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#2d3a44">
+<title>Inspection Readiness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a calm, exact field tool for the walk-around before the client arrives.
+   IDEA: the inspection tag board in a mine workshop: one tag per machine, flipped green when signed off.
+   PICTURE: the overall readiness meter + per-fleet bars on top, then the tag board itself.
+   COLOUR/TYPE: laterite red-earth + graphite on warm stone; sign-off green; Archivo + Archivo Narrow for fleet numbers.
+   LAYOUT: sticky header with meter, fleet filter chips, grouped card grid; one column on phones. */
+:root{color-scheme:light;--hdr:#2d3a44;--hdrink:#f3f1ec;
+--bg:#f3f1ec;--panel:#ffffff;--ink:#1a1c1e;--mute:#6b6862;--line:#e2ded6;--earth:#b0442a;--slate:#2d3a44;
+--ok:#18805a;--okbg:#e3f3ec;--okline:#8cc9ae;--bad:#c22f2f;--badbg:#fbe5e3;--badline:#e9a3a3;
+--prog:#2f63b8;--progbg:#e5ecf8;--na:#8a867f;--nabg:#ecebe7;--glass:rgba(243,241,236,.94)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--hdr:#1f2a32;--hdrink:#eceae6;
+--bg:#121416;--panel:#1b1e21;--ink:#eceae6;--mute:#9a9893;--line:#2b2f33;--earth:#e0714f;--slate:#c9d3da;
+--ok:#3fc08c;--okbg:#13302a;--okline:#2a6b52;--bad:#ff6b6b;--badbg:#3a1a1a;--badline:#7a3333;
+--prog:#7ea6ec;--progbg:#18243a;--na:#77746f;--nabg:#222528;--glass:rgba(18,20,22,.94)}}
+:root[data-theme=dark]{color-scheme:dark;--hdr:#1f2a32;--hdrink:#eceae6;
+--bg:#121416;--panel:#1b1e21;--ink:#eceae6;--mute:#9a9893;--line:#2b2f33;--earth:#e0714f;--slate:#c9d3da;
+--ok:#3fc08c;--okbg:#13302a;--okline:#2a6b52;--bad:#ff6b6b;--badbg:#3a1a1a;--badline:#7a3333;
+--prog:#7ea6ec;--progbg:#18243a;--na:#77746f;--nabg:#222528;--glass:rgba(18,20,22,.94)}
+html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Archivo,system-ui,sans-serif;overflow-x:clip}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--earth);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 max(4vw,14px)}
+header{background:var(--hdr);color:var(--hdrink);padding-top:max(22px,env(safe-area-inset-top));padding:22px 0 18px}
+.hrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center}
+h1{font-size:clamp(26px,4vw,40px);line-height:1.05;margin:0;text-wrap:balance;font-weight:800}
+.sub{margin:6px 0 0;opacity:.8;font-size:14px}
+.live{display:inline-flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--na)}
+.dot.on{background:#3fc08c;box-shadow:0 0 0 4px #3fc08c33}
+.ring{position:relative;width:112px;height:112px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring b{position:absolute;top:0;left:0;right:0;bottom:0;display:grid;place-items:center;font:700 26px/1 'Archivo Narrow',Archivo,system-ui,sans-serif;text-align:center}
+.ring b small{display:block;font:500 12px/1.2 Archivo;opacity:.8}
+.ringarc{transition:stroke-dashoffset .6s ease}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.stat{background:#ffffff14;border:1px solid #ffffff26;border-radius:10px;padding:6px 12px;font-size:14px;white-space:nowrap}
+.stat b{font-family:'Archivo Narrow',Archivo,system-ui,sans-serif;font-size:18px;margin-right:4px}
+.bar{position:sticky;top:0;z-index:5;background:var(--glass);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0;align-items:center}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1 1 420px}
+.chip{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:0 14px;height:40px;cursor:pointer;white-space:nowrap;font-size:14px;font-weight:600}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.search{flex:1 1 120px;height:40px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:0 12px;font-size:16px}
+.sel{height:40px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:0 10px;font-size:15px}
+main{padding:18px 0 100px}
+.group{margin-bottom:28px}
+.ghead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;align-items:end;margin-bottom:10px}
+.ghead h2{margin:0;font-size:20px;font-weight:700}
+.gcount{font:700 16px 'Archivo Narrow',Archivo,system-ui,sans-serif;color:var(--mute);white-space:nowrap}
+.gbar{grid-column:1/-1;height:6px;border-radius:6px;background:var(--line);overflow:hidden}
+.gbar i{display:block;height:100%;background:var(--ok);transition:width .5s ease}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;grid-template-columns:52px minmax(0,1fr);gap:4px 12px;align-items:center;transition:border-color .25s,background .25s}
+.card.ready{border-color:var(--okline);background:linear-gradient(var(--okbg),var(--panel) 70%)}
+.card.issue{border-color:var(--badline)}
+.card.na{opacity:.72}
+.tick{grid-row:span 2;width:52px;height:52px;border-radius:12px;border:3px solid var(--mute);background:var(--panel);cursor:pointer;display:grid;place-items:center;transition:all .2s}
+.tick:hover{border-color:var(--ok)}
+.tick svg{width:30px;height:30px;stroke:var(--line);stroke-width:3.4;fill:none;transition:stroke .2s}
+.tick[aria-checked=true]{background:var(--ok);border-color:var(--ok)}
+.tick[aria-checked=true] svg{stroke:#fff}
+.done{grid-column:1/-1;margin-top:8px;height:46px;border-radius:10px;border:2px solid var(--ok);background:transparent;color:var(--ok);font-weight:700;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s}
+.done svg{width:20px;height:20px;stroke:currentColor;stroke-width:3;fill:none}
+.done[aria-pressed=true]{background:var(--ok);color:#fff}
+.done:disabled{border-color:var(--line);color:var(--mute);cursor:not-allowed}
+.tick:disabled{cursor:not-allowed;opacity:.5}
+.name{font:700 21px/1.1 'Archivo Narrow',Archivo,system-ui,sans-serif;letter-spacing:.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.meta{font-size:12.5px;color:var(--mute);line-height:1.3;min-height:16px}
+.row2{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.status{flex:1;height:40px;border-radius:10px;border:1px solid var(--line);padding:0 8px;font-size:15px;font-weight:600;cursor:pointer}
+.s-pending{background:var(--panel)}.s-progress{background:var(--progbg);color:var(--prog)}.s-issue{background:var(--badbg);color:var(--bad)}
+.s-ready{background:var(--okbg);color:var(--ok)}.s-na{background:var(--nabg);color:var(--na)}
+.ib{width:44px;height:40px;flex:none;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:grid;place-items:center;position:relative}
+.ib svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
+.ib.wide{width:auto;display:flex;gap:6px;padding:0 10px;font-size:13.5px;font-weight:600;white-space:nowrap}
+.row2 .status{flex:1 1 110px}
+.ib.has{color:var(--earth);border-color:var(--earth)}
+.ib.has::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--earth)}
+.note{grid-column:1/-1;font-size:13.5px;color:var(--slate);background:var(--bg);border-radius:8px;padding:6px 9px;margin-top:6px;overflow-wrap:anywhere}
+.tag{font:600 11.5px Archivo;padding:2px 7px;border-radius:6px;background:var(--nabg);color:var(--na)}
+.empty,.msg{padding:28px;text-align:center;color:var(--mute);border:1px dashed var(--line);border-radius:14px}
+.msg.err{color:var(--bad);border-color:var(--bad)}
+.fab{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));height:52px;padding:0 20px;border-radius:999px;border:0;background:var(--earth);color:#fff;font-weight:700;box-shadow:0 8px 24px #0004;cursor:pointer;z-index:6}
+dialog{border:0;border-radius:18px;padding:0;width:min(520px,94vw);background:var(--panel);color:var(--ink);box-shadow:0 20px 60px #0006}
+dialog::backdrop{background:#0008}
+.dlg{padding:20px;display:grid;gap:12px}
+.dlg h3{margin:0;font-size:22px;font-family:'Archivo Narrow'}
+.dlg label{display:grid;gap:4px;font-size:14px;color:var(--mute)}
+.dlg input,.dlg textarea,.dlg select{border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px;background:var(--bg);color:var(--ink)}
+.dlg textarea{min-height:80px;resize:vertical}
+.photo{width:100%;max-height:52vh;object-fit:contain;border-radius:12px;background:var(--bg)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn{height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg);cursor:pointer;font-weight:600}
+.btn.pri{background:var(--earth);border-color:var(--earth);color:#fff}
+.btn.danger{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:84px;transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;transition:all .25s;pointer-events:none;z-index:9}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.seg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1 1 100%;order:2}
+.seg .chip{height:36px;font-size:13.5px}
+.seg .seg-ready[aria-pressed=true]{background:var(--ok);border-color:var(--ok);color:#fff}
+.seg .seg-issue[aria-pressed=true]{background:var(--bad);border-color:var(--bad);color:#fff}
+.tools .search{order:3}.tools .rbtn{order:4}
+button.stat{color:inherit;cursor:pointer;font:inherit;font-size:14px}
+.lockrow{grid-column:1/-1;margin-top:8px;display:flex;gap:6px}
+.lockbadge{flex:1;height:46px;border-radius:10px;background:var(--ok);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px}
+.lockbadge svg,.relock svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+.editbtn{height:46px;padding:0 18px;border-radius:10px;border:2px solid var(--ink);background:var(--panel);color:var(--ink);font-weight:700;cursor:pointer}
+.status:disabled{opacity:.75;cursor:not-allowed}.ib:disabled{opacity:.45;cursor:not-allowed}
+.linkbtn{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font-size:14px}
+.rbtn{height:40px;padding:0 14px;border-radius:10px;border:0;background:var(--earth);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap}
+#report{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;overflow:auto;background:#e9e7e2;color:#1a1c1e;-webkit-overflow-scrolling:touch}
+.rtools{position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:10px max(4vw,14px);background:#2d3a44;align-items:center}
+.rtools span{color:#f3f1ec;margin-right:auto;font-size:14px}
+.sheet{background:#fff;max-width:820px;margin:16px auto 40px;padding:36px 40px;box-shadow:0 4px 20px #0002;font-size:13px;line-height:1.45}
+.sheet h1{font-size:24px;margin:0 0 4px;color:#1a1c1e}
+.sheet .rmeta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:4px 16px;margin:12px 0 16px;padding:10px 0;border-top:2px solid #1a1c1e;border-bottom:1px solid #ccc}
+.sheet .rmeta b{display:block;font-size:11px;color:#6b6862;font-weight:600}
+.sheet .rmeta input{border:0;border-bottom:1px dotted #999;font:inherit;width:100%;padding:2px 0;background:transparent;color:#1a1c1e}
+.rsum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.rsum div{border:1px solid #ccc;border-radius:6px;padding:6px 12px}.rsum b{font-size:18px;margin-right:4px}
+.sheet h2{font-size:15px;margin:18px 0 6px;padding-bottom:4px;border-bottom:1px solid #1a1c1e;display:flex;justify-content:space-between}
+.sheet table{width:100%;border-collapse:collapse;table-layout:fixed}
+.sheet th:nth-child(1){width:17%}.sheet th:nth-child(2){width:15%}.sheet th:nth-child(4){width:15%}.sheet th:nth-child(5){width:136px}
+.sheet td{overflow-wrap:anywhere}
+.sheet th{text-align:left;font-size:11px;color:#6b6862;font-weight:600;border-bottom:1px solid #ccc;padding:4px 6px}
+.sheet td{border-bottom:1px solid #e4e1db;padding:6px;vertical-align:top}
+.sheet tr{break-inside:avoid;page-break-inside:avoid}
+.sheet .an{font-weight:700;white-space:nowrap}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-weight:600;font-size:12px;white-space:nowrap;border:1px solid #bbb}
+.pill.ready{background:#e3f3ec;border-color:#8cc9ae;color:#18805a}.pill.issue{background:#fbe5e3;border-color:#e9a3a3;color:#c22f2f}
+.pill.progress{background:#e5ecf8;border-color:#a9c0e6;color:#2f63b8}.pill.na{color:#8a867f}
+.sheet td img{width:120px;height:90px;object-fit:cover;border-radius:4px;display:block}
+.nophoto{color:#aaa;font-size:12px}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:30px;break-inside:avoid;page-break-inside:avoid}
+.sign h3{font-size:13px;margin:0 0 14px}
+.sign p{margin:0 0 20px;border-bottom:1px solid #1a1c1e;padding-top:30px;font-size:11px;color:#6b6862;position:relative}
+.sign p span{position:absolute;top:0;left:0}
+.decl{margin-top:24px;padding:10px 12px;border:1px solid #ccc;border-radius:6px;break-inside:avoid}
+@media(max-width:600px){.tools{gap:6px;padding:8px 0}.chip{height:36px}.search,.sel,.rbtn{height:38px}.sel{flex:0 1 auto;max-width:34%}.rbtn{padding:0 10px}.sheet th:nth-child(5){width:92px}.sheet{padding:20px 16px;margin:0}.sign{grid-template-columns:1fr}.sheet td img{width:84px;height:64px}}
+@page{size:A4;margin:12mm}
+@media print{html,body{background:#fff!important}body>*:not(#report){display:none!important}#report{position:static;overflow:visible;background:#fff}.rtools{display:none}
+.sheet{box-shadow:none;margin:0;padding:0;max-width:none}.sheet .rmeta input{border:0}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media(max-width:600px){.hrow{grid-template-columns:minmax(0,1fr) 92px}.ring{width:92px;height:92px}.ring b{font-size:21px}.grid{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="hrow">
+      <div>
+        <h1>Client inspection readiness</h1>
+        <p class="sub"><span class="live"><span class="dot" id="dot"></span><span id="sync">Connecting to shared sheet…</span></span> · <button class="linkbtn" id="who">Set your name</button></p>
+      </div>
+      <div class="ring" aria-label="Overall readiness">
+        <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" stroke="#ffffff22" stroke-width="12" fill="none"/>
+        <circle id="arc" class="ringarc" cx="60" cy="60" r="50" stroke="#3fc08c" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16"/></svg>
+        <b><span><span id="pct">0%</span><small>complete</small></span></b>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</header>
+<div class="bar"><div class="wrap tools">
+  <div class="chips" id="chips" role="toolbar" aria-label="Asset type"></div>
+  <input class="search" id="q" type="search" placeholder="Search asset…" aria-label="Search asset">
+  <div class="seg" id="sf" role="toolbar" aria-label="Filter by status"></div>
+  <button class="rbtn" id="repBtn">Sign-off report</button>
+</div></div>
+<main class="wrap" id="board"><div class="msg">Loading assets…</div></main>
+<button class="fab" id="addBtn" hidden>+ Add asset</button>
+<input type="file" id="file" accept="image/*" hidden>
+
+<dialog id="dlg"><form class="dlg" id="dform" method="dialog"></form></dialog>
+<div class="toast" id="toast"></div>
+<div id="report" hidden></div>
+
+<script>
+{
+/* ==== PASTE YOUR APPS SCRIPT WEB APP URL HERE (ends with /exec) ==== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbwR021DC4aiCbXa8kSPqFi2zvzeUnf-Nohr9t3FlIxAGz2VUsxCc3EAEjhrv7FJfOI/exec';
+/* =================================================================== */
+const POLL_MS=10000;
+const ST={pending:'Pending',progress:'In progress',issue:'Issue',ready:'Completed',na:'Not in scope'};
+const TYPES=['Articulated dump trucks','Excavators','Track dozers','Wheel loaders','Fuel trucks','Motor grader'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=id=>document.getElementById(id);
+const IC={cam:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+ note:'<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/></svg>',
+ tick:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'};
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let unlocked=new Set(),assets=[],filt=store.get('ir.filter')||'All',q='',sf='',photoTarget=null,me=store.get('ir.name')||'',inflight=0,lastOk=0;
+const canWrite=true;
+const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2400)};
+const ago=ts=>{if(!ts)return'';const m=Math.round((Date.now()-ts)/60000);if(m<1)return'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' h ago';return new Date(ts).toLocaleDateString(undefined,{day:'numeric',month:'short'})};
+const natural=(a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true});
+
+/* ---- API (text/plain POST avoids CORS preflight with Apps Script) ---- */
+async function apiGet(params){
+  const u=API_URL+'?'+new URLSearchParams({...params,_:Date.now()});
+  const r=await fetch(u,{redirect:'follow'});const j=await r.json();if(!j.ok)throw new Error(j.error||'error');return j;
+}
+async function apiPost(body){
+  inflight++;
+  try{const r=await fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,by:me})});
+    const j=await r.json();if(!j.ok)throw new Error(j.error||'error');return j}
+  finally{inflight--}
+}
+
+function counts(list){const c={pending:0,progress:0,issue:0,ready:0,na:0};list.forEach(a=>c[a.status in c?a.status:'pending']++);c.scope=list.length-c.na;return c}
+
+function renderHead(){
+  const c=counts(assets),p=c.scope?Math.round(c.ready/c.scope*100):0;
+  $('pct').textContent=p+'%';$('arc').style.strokeDashoffset=314.16*(1-p/100);
+  $('stats').innerHTML=[[c.ready+' / '+c.scope,'completed','ready'],[c.pending+c.progress,'open','open'],[c.issue,'issues','issue'],[c.na,'not in scope','na']]
+   .map(([v,l,k])=>`<button class="stat" data-sf="${k}"><b>${esc(v)}</b>${l}</button>`).join('');
+  const segs=[['','All statuses',assets.length],['open','Open',c.pending+c.progress],['ready','Completed',c.ready],['issue','Issues',c.issue],['na','Not in scope',c.na]];
+  $('sf').innerHTML=segs.map(([k,l,n])=>`<button class="chip seg-${k||'all'}" data-sf="${k}" aria-pressed="${k===sf}">${l} · ${n}</button>`).join('');
+  const types=['All',...TYPES.filter(t=>assets.some(a=>a.type===t)),...[...new Set(assets.map(a=>a.type))].filter(t=>!TYPES.includes(t))];
+  if(!types.includes(filt))filt='All';
+  $('chips').innerHTML=types.map(t=>{const l=t==='All'?assets.length:assets.filter(a=>a.type===t).length;return`<button class="chip" data-t="${esc(t)}" aria-pressed="${t===filt}">${esc(t)} · ${l}</button>`}).join('');
+}
+
+const isLocked=a=>a.status==='ready'&&!unlocked.has(a.id);
+const LOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+function card(a){
+  const done=a.status==='ready',na=a.status==='na',lk=isLocked(a);
+  const meta=a.at?`${esc(ST[a.status])} · ${esc(a.by||'Someone')} · ${esc(ago(a.at))}`:'Not updated yet';
+  return`<div class="card ${esc(a.status)}" data-id="${esc(a.id)}">
+  <button class="tick" role="checkbox" aria-checked="${done}" aria-label="Mark ${esc(a.name)} complete" data-act="${lk?'edit':'tick'}" ${na?'disabled':''}>${IC.tick}</button>
+  <div class="name">${esc(a.name)}${a.tag?`<span class="tag">${esc(a.tag)}</span>`:''}</div>
+  <div class="meta">${meta}</div>
+  ${lk?`<div class="lockrow"><span class="lockbadge">${LOCK}Completed · locked</span><button class="editbtn" data-act="edit">Edit</button></div>`
+     :`<button class="done" data-act="tick" aria-pressed="${done}" ${na?'disabled':''}>${na?'Not in scope':done?IC.tick+'Completed — tap to undo':'Mark complete'}</button>`}
+  <div class="row2">
+   <select class="status s-${esc(a.status)}" data-act="status" aria-label="Status of ${esc(a.name)}" ${lk?'disabled':''}>${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${k===a.status?'selected':''}>${v}</option>`).join('')}</select>
+   <button class="ib wide ${a.photo?'has':''}" data-act="photo" ${lk&&!a.photo?'disabled':''}>${IC.cam}<span>${a.photo?'View photo':'Add photo'}</span></button>
+   <button class="ib wide ${a.note?'has':''}" data-act="note">${IC.note}<span>Note</span></button>
+   ${done&&!lk?`<button class="ib wide relock" data-act="lock">${LOCK}<span>Lock</span></button>`:''}
+  </div>${a.note?`<div class="note">${esc(a.note)}</div>`:''}</div>`;
+}
+
+function render(){
+  renderHead();
+  const ql=q.trim().toLowerCase().replace(/[\s-]/g,'');
+  const vis=assets.filter(a=>(filt==='All'||a.type===filt)&&(!sf||(sf==='open'?(a.status==='pending'||a.status==='progress'):a.status===sf))&&(!ql||a.name.toLowerCase().replace(/[\s-]/g,'').includes(ql)));
+  if(!assets.length){$('board').innerHTML='<div class="empty">No assets on the board yet.</div>';return}
+  if(!vis.length){$('board').innerHTML='<div class="empty">No assets match this filter.</div>';return}
+  const ord=t=>{const i=TYPES.indexOf(t);return i<0?99:i};
+  const types=[...new Set(vis.map(a=>a.type))].sort((x,y)=>ord(x)-ord(y)||x.localeCompare(y));
+  $('board').innerHTML=types.map(t=>{
+    const all=assets.filter(a=>a.type===t),c=counts(all),p=c.scope?c.ready/c.scope*100:0,list=vis.filter(a=>a.type===t).sort(natural);
+    return`<section class="group"><div class="ghead"><h2>${esc(t)}</h2><span class="gcount">${c.ready} / ${c.scope} done</span><div class="gbar"><i style="width:${p}%"></i></div></div>
+    <div class="grid">${list.map(card).join('')}</div></section>`}).join('');
+}
+
+const busyRender=()=>!dlg.open&&!$('board').contains(document.activeElement);
+function setSync(ok,text){$('dot').classList.toggle('on',ok);$('sync').textContent=text}
+
+async function load(){
+  if(inflight)return;
+  try{
+    const j=await apiGet({action:'list'});if(inflight)return;
+    assets=(j.assets||[]).map(x=>({id:String(x.id),name:String(x.name||x.id),type:String(x.type||'Other'),status:ST[x.status]?x.status:'pending',
+      tag:String(x.tag||''),note:String(x.note||''),photoId:String(x.photoId||''),photo:!!x.photoId,by:String(x.updatedBy||''),at:Number(x.updatedAt)||0}));
+    lastOk=Date.now();setSync(true,'Live · shared with everyone on this link');
+    if(busyRender()||!$('board').querySelector('.card'))render();
+  }catch(e){
+    setSync(false,lastOk?'Offline — showing last data, retrying…':'Can’t reach the shared sheet — retrying…');
+    if(!assets.length)$('board').innerHTML='<div class="msg err">Can’t reach the shared sheet. Check your connection; it will retry automatically.</div>';
+  }
+}
+
+async function save(id,patch){
+  const a=assets.find(x=>x.id===id);if(!a)return;
+  const before={status:a.status,note:a.note,by:a.by,at:a.at};
+  Object.assign(a,patch,{by:me,at:Date.now()});if(patch.status==='ready')unlocked.delete(id);render();
+  try{await apiPost({action:'update',id,...patch})}
+  catch(e){Object.assign(a,before);render();toast('Not saved — check connection and try again')}
+}
+
+/* ---- name (no sign-in: each person types their name once on this device) ---- */
+const dlg=$('dlg'),form=$('dform');
+function askName(then){
+  form.innerHTML=`<h3>Your name</h3><label>Shown next to the updates you make<input id="nm" maxlength="40" required autocomplete="name"></label>
+  <div class="btns"><button class="btn pri" value="ok">Continue</button></div>`;
+  $('nm').value=me;dlg.returnValue='';dlg.showModal();
+  dlg.onclose=()=>{const v=($('nm')&&$('nm').value.trim())||'';if(v){me=v;store.set('ir.name',v);$('who').textContent='You: '+v}
+    if(!me){setTimeout(()=>askName(then),50);return}if(then)then()};
+}
+const needName=fn=>{if(me)fn();else askName(fn)};
+
+$('board').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b||b.tagName==='SELECT')return;
+  const id=b.closest('.card').dataset.id,a=assets.find(x=>x.id===id);if(!a)return;
+  const act=b.dataset.act;
+  if(act==='edit'){confirmEdit(a);return}
+  if(act==='lock'){unlocked.delete(id);render();toast(a.name+' locked');return}
+  if(isLocked(a)&&act!=='note'&&act!=='photo')return;
+  if(act==='tick')needName(()=>{const to=a.status==='ready'?'pending':'ready';save(id,{status:to});toast(a.name+(to==='ready'?' marked complete':' set back to pending'))});
+  if(act==='note')openNote(a);
+  if(act==='photo'){if(a.photo)openPhoto(a);else if(me){photoTarget=id;$('file').click()}else askName(()=>{photoTarget=id;$('file').click()})}
+});
+$('board').addEventListener('change',e=>{if(e.target.dataset.act==='status'){const id=e.target.closest('.card').dataset.id,v=e.target.value;needName(()=>save(id,{status:v}))}});
+$('chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(c){filt=c.dataset.t;store.set('ir.filter',filt);render()}});
+$('q').addEventListener('input',e=>{q=e.target.value;render()});
+const setSf=v=>{sf=v;render();window.scrollTo({top:0,behavior:'smooth'})};
+$('sf').addEventListener('click',e=>{const c=e.target.closest('[data-sf]');if(c)setSf(sf===c.dataset.sf&&c.dataset.sf?'':c.dataset.sf)});
+$('stats').addEventListener('click',e=>{const c=e.target.closest('[data-sf]');if(c)setSf(c.dataset.sf)});
+function confirmEdit(a){
+  form.innerHTML=`<h3>Edit ${esc(a.name)}?</h3><p style="margin:0">This asset is signed off as completed${a.by?' by '+esc(a.by):''}. Unlock it to change its status, photo or note. It locks again when you mark it complete or tap Lock.</p>
+  <div class="btns"><button class="btn" value="x">Cancel</button><button class="btn pri" value="ok">Unlock to edit</button></div>`;
+  dlg.returnValue='';dlg.showModal();
+  dlg.onclose=()=>{if(dlg.returnValue==='ok'){unlocked.add(a.id);render();toast(a.name+' unlocked for editing')}};
+}
+$('who').addEventListener('click',()=>askName());
+
+function openNote(a){
+  const lk=isLocked(a);
+  form.innerHTML=`<h3>${esc(a.name)} — note</h3><label>Remark for inspection${lk?' (locked — tap Edit on the card to change)':''}<textarea id="nt" maxlength="500" ${lk?'readonly':''}></textarea></label>
+  <div class="btns"><button class="btn${lk?' pri':''}" value="x">Close</button>${lk?'':'<button class="btn pri" value="ok">Save note</button>'}</div>`;
+  $('nt').value=a.note||'';dlg.returnValue='';dlg.showModal();
+  dlg.onclose=()=>{if(dlg.returnValue==='ok'){const v=$('nt').value.trim();if(v!==(a.note||''))needName(()=>save(a.id,{note:v}))}};
+}
+async function openPhoto(a){
+  form.innerHTML=`<h3>${esc(a.name)} — photo</h3><div class="msg" id="pl">Loading photo…</div>
+  <div class="btns">${isLocked(a)?'':'<button class="btn danger" value="del">Remove</button><button class="btn" value="re">Retake</button>'}<button class="btn pri" value="x">Close</button></div>`;
+  dlg.returnValue='';dlg.showModal();
+  const rb=form.querySelector('[value=re]');if(rb)rb.addEventListener('click',()=>{photoTarget=a.id;$('file').click()});
+  dlg.onclose=async()=>{if(dlg.returnValue!=='del')return;
+    try{await apiPost({action:'unphoto',id:a.id});a.photo=false;a.photoId='';render();toast('Photo removed')}catch(e){toast('Could not remove photo')}};
+  try{const j=await apiGet({action:'photo',id:a.photoId});const pl=$('pl');if(!pl)return;
+    if(typeof j.img==='string'&&/^data:image\/(jpeg|png);base64,/.test(j.img)){const im=new Image();im.className='photo';im.alt=a.name+' photo';im.src=j.img;pl.replaceWith(im)}
+    else pl.textContent='Photo not found.'}
+  catch(e){const pl=$('pl');if(pl)pl.textContent='Could not load photo.'}
+}
+async function shrink(file){
+  const url=URL.createObjectURL(file);
+  try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
+    let max=1200,qual=.72,out='';
+    for(let k=0;k<6;k++){const r=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');
+      c.width=Math.round(img.naturalWidth*r);c.height=Math.round(img.naturalHeight*r);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      out=c.toDataURL('image/jpeg',qual);if(out.length<380000)break;max*=.8;qual-=.08}
+    return out}
+  finally{URL.revokeObjectURL(url)}
+}
+$('file').addEventListener('change',async e=>{
+  const f=e.target.files[0],id=photoTarget;e.target.value='';if(!f||!id)return;
+  let img;try{img=await shrink(f)}catch(err){toast('This image format isn’t supported — try a JPEG');return}
+  toast('Uploading photo…');
+  try{const j=await apiPost({action:'photo',id,img});const a=assets.find(x=>x.id===id);if(a){a.photo=true;a.photoId=j.photoId;a.by=me;a.at=Date.now()}render();toast('Photo saved')}
+  catch(err){toast('Photo upload failed — try again')}
+});
+$('addBtn').addEventListener('click',()=>needName(()=>{
+  form.innerHTML=`<h3>Add asset</h3><label>Asset name<input id="an" required maxlength="40" placeholder="e.g. REX-009"></label>
+  <label>Asset type<select id="at">${TYPES.map(t=>`<option>${t}</option>`).join('')}</select></label>
+  <div class="btns"><button class="btn" value="x" formnovalidate>Cancel</button><button class="btn pri" value="ok">Add</button></div>`;
+  dlg.returnValue='';dlg.showModal();
+  dlg.onclose=async()=>{if(dlg.returnValue!=='ok')return;const n=$('an').value.trim().toUpperCase(),t=$('at').value;if(!n)return;
+    try{await apiPost({action:'add',name:n,type:t});toast(n+' added');load()}catch(e){toast(String(e.message).includes('exists')?n+' already exists':'Could not add asset')}};
+}));
+
+/* ---- Sign-off report (print / save as PDF) ---- */
+const rep=$('report');
+async function openReport(){
+  if(!assets.length){toast('No assets loaded yet');return}
+  const c=counts(assets),p=c.scope?Math.round(c.ready/c.scope*100):0,today=new Date().toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'});
+  const ord=t=>{const i=TYPES.indexOf(t);return i<0?99:i};
+  const types=[...new Set(assets.map(a=>a.type))].sort((x,y)=>ord(x)-ord(y)||x.localeCompare(y));
+  const withPhoto=assets.filter(a=>a.photo).length;
+  rep.innerHTML=`<div class="rtools"><span id="rstat">${withPhoto?'Loading photos 0 / '+withPhoto+'…':'Report ready'}</span>
+   <button class="btn" id="rclose">Close</button><button class="btn pri" id="rprint">Print / Save PDF</button></div>
+  <div class="sheet">
+   <h1>Asset inspection sign-off</h1><div>Hardware installation — client inspection readiness</div>
+   <div class="rmeta">
+    <label><b>Site</b><input value="Sycamore Mine"></label>
+    <label><b>Client</b><input placeholder="Client company"></label>
+    <label><b>Report date</b><input value="${esc(today)}"></label>
+    <label><b>Prepared by</b><input value="${esc(me)}"></label>
+   </div>
+   <div class="rsum"><div><b>${p}%</b>ready</div><div><b>${c.ready} / ${c.scope}</b>in-scope assets ready</div><div><b>${c.issue}</b>issues</div><div><b>${c.pending+c.progress}</b>open</div><div><b>${c.na}</b>not in scope</div></div>
+   ${types.map(t=>{const list=assets.filter(a=>a.type===t).sort(natural),cc=counts(list);
+     return`<h2><span>${esc(t)}</span><span>${cc.ready} / ${cc.scope} ready</span></h2><table><thead><tr><th>Asset</th><th>Status</th><th>Remarks</th><th>Updated</th><th>Photo</th></tr></thead><tbody>
+     ${list.map(a=>`<tr><td class="an">${esc(a.name)}${a.tag?`<br><span class="nophoto">${esc(a.tag)}</span>`:''}</td><td><span class="pill ${esc(a.status)}">${esc(ST[a.status])}</span></td>
+       <td>${esc(a.note)||'—'}</td><td>${a.at?esc(a.by||'')+'<br>'+esc(new Date(a.at).toLocaleDateString(undefined,{day:'2-digit',month:'short'})):'—'}</td>
+       <td>${a.photo?`<div class="nophoto" data-ph="${esc(a.id)}">loading…</div>`:'<span class="nophoto">—</span>'}</td></tr>`).join('')}</tbody></table>`}).join('')}
+   <div class="decl">The client confirms that the assets marked <b>Completed</b> above have been inspected and the installed hardware is accepted. Any asset marked Issue, Pending or In progress is listed as an open item.<br><br>Open items / comments: ______________________________________________________________<br><br>______________________________________________________________________________</div>
+   <div class="sign">
+    <div><h3>Client representative</h3><p><span>Name</span></p><p><span>Designation</span></p><p><span>Signature</span></p><p><span>Date</span></p></div>
+    <div><h3>Reactore representative</h3><p><span>Name</span></p><p><span>Designation</span></p><p><span>Signature</span></p><p><span>Date</span></p></div>
+   </div>
+  </div>`;
+  rep.hidden=false;document.body.style.overflow='hidden';
+  $('rclose').onclick=()=>{rep.hidden=true;rep.innerHTML='';document.body.style.overflow=''};
+  $('rprint').onclick=()=>window.print();
+  const queue=assets.filter(a=>a.photo);let done=0;
+  const worker=async()=>{while(queue.length){const a=queue.shift();const slot=rep.querySelector(`[data-ph="${CSS.escape(a.id)}"]`);
+    try{const j=await apiGet({action:'photo',id:a.photoId});if(slot&&/^data:image\/(jpeg|png);base64,/.test(j.img)){const im=new Image();im.alt=a.name;im.src=j.img;slot.replaceWith(im)}else if(slot)slot.textContent='not found'}
+    catch(e){if(slot)slot.textContent='failed'}
+    done++;const st=$('rstat');if(st)st.textContent=done<withPhoto?`Loading photos ${done} / ${withPhoto}…`:'Report ready — print or save as PDF'}};
+  await Promise.all([worker(),worker(),worker(),worker()]);
+}
+$('repBtn').addEventListener('click',openReport);
+
+if(!API_URL){
+  setSync(false,'Setup needed');
+  $('board').innerHTML='<div class="msg err">This page isn’t connected to its Google Sheet yet. Paste the Apps Script web app URL into API_URL in index.html.</div>';
+}else{
+  $('addBtn').hidden=false;
+  if(me)$('who').textContent='You: '+me;
+  load();
+  setInterval(()=>{if(document.visibilityState==='visible')load()},POLL_MS);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')load()});
+  setInterval(()=>{if(assets.length&&busyRender())render()},60000);
+}
+}
+</script>
+</body>
+</html>
