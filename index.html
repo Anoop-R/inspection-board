@@ -106,6 +106,17 @@ dialog::backdrop{background:#0008}
 .btn.danger{color:var(--bad)}
 .toast{position:fixed;left:50%;bottom:84px;transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;transition:all .25s;pointer-events:none;z-index:9}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.seg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1 1 100%;order:2}
+.seg .chip{height:36px;font-size:13.5px}
+.seg .seg-ready[aria-pressed=true]{background:var(--ok);border-color:var(--ok);color:#fff}
+.seg .seg-issue[aria-pressed=true]{background:var(--bad);border-color:var(--bad);color:#fff}
+.tools .search{order:3}.tools .rbtn{order:4}
+button.stat{color:inherit;cursor:pointer;font:inherit;font-size:14px}
+.lockrow{grid-column:1/-1;margin-top:8px;display:flex;gap:6px}
+.lockbadge{flex:1;height:46px;border-radius:10px;background:var(--ok);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px}
+.lockbadge svg,.relock svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+.editbtn{height:46px;padding:0 18px;border-radius:10px;border:2px solid var(--ink);background:var(--panel);color:var(--ink);font-weight:700;cursor:pointer}
+.status:disabled{opacity:.75;cursor:not-allowed}.ib:disabled{opacity:.45;cursor:not-allowed}
 .linkbtn{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font-size:14px}
 .rbtn{height:40px;padding:0 14px;border-radius:10px;border:0;background:var(--earth);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap}
 #report{position:fixed;top:0;left:0;right:0;bottom:0;z-index:20;overflow:auto;background:#e9e7e2;color:#1a1c1e;-webkit-overflow-scrolling:touch}
@@ -151,12 +162,12 @@ dialog::backdrop{background:#0008}
     <div class="hrow">
       <div>
         <h1>Client inspection readiness</h1>
-        <p class="sub"><span class="live"><span class="dot" id="dot"></span><span id="sync">Connecting to shared sheet…</span></span> · <button class="linkbtn" id="who">Set your name</button></p>
+        <p class="sub"><span class="live"><span class="dot" id="dot"></span><span id="sync">Connecting to shared sheet…</span></span> · <button class="linkbtn" id="who">Add your name (optional)</button></p>
       </div>
       <div class="ring" aria-label="Overall readiness">
         <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" stroke="#ffffff22" stroke-width="12" fill="none"/>
         <circle id="arc" class="ringarc" cx="60" cy="60" r="50" stroke="#3fc08c" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16"/></svg>
-        <b><span><span id="pct">0%</span><small>ready</small></span></b>
+        <b><span><span id="pct">0%</span><small>complete</small></span></b>
       </div>
     </div>
     <div class="stats" id="stats"></div>
@@ -165,10 +176,7 @@ dialog::backdrop{background:#0008}
 <div class="bar"><div class="wrap tools">
   <div class="chips" id="chips" role="toolbar" aria-label="Asset type"></div>
   <input class="search" id="q" type="search" placeholder="Search asset…" aria-label="Search asset">
-  <select class="sel" id="sf" aria-label="Filter by status">
-    <option value="">All statuses</option><option value="pending">Pending</option><option value="progress">In progress</option>
-    <option value="issue">Issue</option><option value="ready">Ready</option><option value="na">Not in scope</option>
-  </select>
+  <div class="seg" id="sf" role="toolbar" aria-label="Filter by status"></div>
   <button class="rbtn" id="repBtn">Sign-off report</button>
 </div></div>
 <main class="wrap" id="board"><div class="msg">Loading assets…</div></main>
@@ -185,7 +193,7 @@ dialog::backdrop{background:#0008}
 const API_URL = 'https://script.google.com/macros/s/AKfycbwR021DC4aiCbXa8kSPqFi2zvzeUnf-Nohr9t3FlIxAGz2VUsxCc3EAEjhrv7FJfOI/exec';
 /* =================================================================== */
 const POLL_MS=10000;
-const ST={pending:'Pending',progress:'In progress',issue:'Issue',ready:'Ready',na:'Not in scope'};
+const ST={pending:'Pending',progress:'In progress',issue:'Issue',ready:'Completed',na:'Not in scope'};
 const TYPES=['Articulated dump trucks','Excavators','Track dozers','Wheel loaders','Fuel trucks','Motor grader'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=id=>document.getElementById(id);
@@ -193,7 +201,7 @@ const IC={cam:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><cir
  note:'<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/></svg>',
  tick:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'};
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-let assets=[],filt=store.get('ir.filter')||'All',q='',sf='',photoTarget=null,me=store.get('ir.name')||'',inflight=0,lastOk=0;
+let unlocked=new Set(),assets=[],filt=store.get('ir.filter')||'All',q='',sf='',photoTarget=null,me=store.get('ir.name')||'',inflight=0,lastOk=0;
 const canWrite=true;
 const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2400)};
 const ago=ts=>{if(!ts)return'';const m=Math.round((Date.now()-ts)/60000);if(m<1)return'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<24)return h+' h ago';return new Date(ts).toLocaleDateString(undefined,{day:'numeric',month:'short'})};
@@ -216,39 +224,45 @@ function counts(list){const c={pending:0,progress:0,issue:0,ready:0,na:0};list.f
 function renderHead(){
   const c=counts(assets),p=c.scope?Math.round(c.ready/c.scope*100):0;
   $('pct').textContent=p+'%';$('arc').style.strokeDashoffset=314.16*(1-p/100);
-  $('stats').innerHTML=[[c.ready+' / '+c.scope,'ready'],[c.pending,'pending'],[c.progress,'in progress'],[c.issue,'issues'],[c.na,'not in scope']]
-   .map(([v,l])=>`<span class="stat"><b>${esc(v)}</b>${l}</span>`).join('');
+  $('stats').innerHTML=[[c.ready+' / '+c.scope,'completed','ready'],[c.pending+c.progress,'open','open'],[c.issue,'issues','issue'],[c.na,'not in scope','na']]
+   .map(([v,l,k])=>`<button class="stat" data-sf="${k}"><b>${esc(v)}</b>${l}</button>`).join('');
+  const segs=[['','All statuses',assets.length],['open','Open',c.pending+c.progress],['ready','Completed',c.ready],['issue','Issues',c.issue],['na','Not in scope',c.na]];
+  $('sf').innerHTML=segs.map(([k,l,n])=>`<button class="chip seg-${k||'all'}" data-sf="${k}" aria-pressed="${k===sf}">${l} · ${n}</button>`).join('');
   const types=['All',...TYPES.filter(t=>assets.some(a=>a.type===t)),...[...new Set(assets.map(a=>a.type))].filter(t=>!TYPES.includes(t))];
   if(!types.includes(filt))filt='All';
   $('chips').innerHTML=types.map(t=>{const l=t==='All'?assets.length:assets.filter(a=>a.type===t).length;return`<button class="chip" data-t="${esc(t)}" aria-pressed="${t===filt}">${esc(t)} · ${l}</button>`}).join('');
 }
 
+const isLocked=a=>a.status==='ready'&&!unlocked.has(a.id);
+const LOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 function card(a){
-  const done=a.status==='ready',na=a.status==='na';
+  const done=a.status==='ready',na=a.status==='na',lk=isLocked(a);
   const meta=a.at?`${esc(ST[a.status])} · ${esc(a.by||'Someone')} · ${esc(ago(a.at))}`:'Not updated yet';
   return`<div class="card ${esc(a.status)}" data-id="${esc(a.id)}">
-  <button class="tick" role="checkbox" aria-checked="${done}" aria-label="Mark ${esc(a.name)} complete" data-act="tick" ${na?'disabled':''}>${IC.tick}</button>
+  <button class="tick" role="checkbox" aria-checked="${done}" aria-label="Mark ${esc(a.name)} complete" data-act="${lk?'edit':'tick'}" ${na?'disabled':''}>${IC.tick}</button>
   <div class="name">${esc(a.name)}${a.tag?`<span class="tag">${esc(a.tag)}</span>`:''}</div>
   <div class="meta">${meta}</div>
-  <button class="done" data-act="tick" aria-pressed="${done}" ${na?'disabled':''}>${na?'Not in scope':done?IC.tick+'Completed — tap to undo':'Mark complete'}</button>
+  ${lk?`<div class="lockrow"><span class="lockbadge">${LOCK}Completed · locked</span><button class="editbtn" data-act="edit">Edit</button></div>`
+     :`<button class="done" data-act="tick" aria-pressed="${done}" ${na?'disabled':''}>${na?'Not in scope':done?IC.tick+'Completed — tap to undo':'Mark complete'}</button>`}
   <div class="row2">
-   <select class="status s-${esc(a.status)}" data-act="status" aria-label="Status of ${esc(a.name)}">${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${k===a.status?'selected':''}>${v}</option>`).join('')}</select>
-   <button class="ib wide ${a.photo?'has':''}" data-act="photo">${IC.cam}<span>${a.photo?'View photo':'Add photo'}</span></button>
+   <select class="status s-${esc(a.status)}" data-act="status" aria-label="Status of ${esc(a.name)}" ${lk?'disabled':''}>${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${k===a.status?'selected':''}>${v}</option>`).join('')}</select>
+   <button class="ib wide ${a.photo?'has':''}" data-act="photo" ${lk&&!a.photo?'disabled':''}>${IC.cam}<span>${a.photo?'View photo':'Add photo'}</span></button>
    <button class="ib wide ${a.note?'has':''}" data-act="note">${IC.note}<span>Note</span></button>
+   ${done&&!lk?`<button class="ib wide relock" data-act="lock">${LOCK}<span>Lock</span></button>`:''}
   </div>${a.note?`<div class="note">${esc(a.note)}</div>`:''}</div>`;
 }
 
 function render(){
   renderHead();
   const ql=q.trim().toLowerCase().replace(/[\s-]/g,'');
-  const vis=assets.filter(a=>(filt==='All'||a.type===filt)&&(!sf||a.status===sf)&&(!ql||a.name.toLowerCase().replace(/[\s-]/g,'').includes(ql)));
+  const vis=assets.filter(a=>(filt==='All'||a.type===filt)&&(!sf||(sf==='open'?(a.status==='pending'||a.status==='progress'):a.status===sf))&&(!ql||a.name.toLowerCase().replace(/[\s-]/g,'').includes(ql)));
   if(!assets.length){$('board').innerHTML='<div class="empty">No assets on the board yet.</div>';return}
   if(!vis.length){$('board').innerHTML='<div class="empty">No assets match this filter.</div>';return}
   const ord=t=>{const i=TYPES.indexOf(t);return i<0?99:i};
   const types=[...new Set(vis.map(a=>a.type))].sort((x,y)=>ord(x)-ord(y)||x.localeCompare(y));
   $('board').innerHTML=types.map(t=>{
     const all=assets.filter(a=>a.type===t),c=counts(all),p=c.scope?c.ready/c.scope*100:0,list=vis.filter(a=>a.type===t).sort(natural);
-    return`<section class="group"><div class="ghead"><h2>${esc(t)}</h2><span class="gcount">${c.ready} / ${c.scope} ready</span><div class="gbar"><i style="width:${p}%"></i></div></div>
+    return`<section class="group"><div class="ghead"><h2>${esc(t)}</h2><span class="gcount">${c.ready} / ${c.scope} done</span><div class="gbar"><i style="width:${p}%"></i></div></div>
     <div class="grid">${list.map(card).join('')}</div></section>`}).join('');
 }
 
@@ -272,7 +286,7 @@ async function load(){
 async function save(id,patch){
   const a=assets.find(x=>x.id===id);if(!a)return;
   const before={status:a.status,note:a.note,by:a.by,at:a.at};
-  Object.assign(a,patch,{by:me,at:Date.now()});render();
+  Object.assign(a,patch,{by:me,at:Date.now()});if(patch.status==='ready')unlocked.delete(id);render();
   try{await apiPost({action:'update',id,...patch})}
   catch(e){Object.assign(a,before);render();toast('Not saved — check connection and try again')}
 }
@@ -280,39 +294,51 @@ async function save(id,patch){
 /* ---- name (no sign-in: each person types their name once on this device) ---- */
 const dlg=$('dlg'),form=$('dform');
 function askName(then){
-  form.innerHTML=`<h3>Your name</h3><label>Shown next to the updates you make<input id="nm" maxlength="40" required autocomplete="name"></label>
-  <div class="btns"><button class="btn pri" value="ok">Continue</button></div>`;
+  form.innerHTML=`<h3>Your name (optional)</h3><label>Shown next to the updates you make<input id="nm" maxlength="40" autocomplete="name"></label>
+  <div class="btns"><button class="btn" value="x" formnovalidate>Skip</button><button class="btn pri" value="ok">Save</button></div>`;
   $('nm').value=me;dlg.returnValue='';dlg.showModal();
-  dlg.onclose=()=>{const v=($('nm')&&$('nm').value.trim())||'';if(v){me=v;store.set('ir.name',v);$('who').textContent='You: '+v}
-    if(!me){setTimeout(()=>askName(then),50);return}if(then)then()};
+  dlg.onclose=()=>{const v=dlg.returnValue==='ok'&&$('nm')?$('nm').value.trim():'';if(v){me=v;store.set('ir.name',v);$('who').textContent='You: '+v}
+    if(then)then()};
 }
-const needName=fn=>{if(me)fn();else askName(fn)};
+const needName=fn=>fn();
 
 $('board').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b||b.tagName==='SELECT')return;
   const id=b.closest('.card').dataset.id,a=assets.find(x=>x.id===id);if(!a)return;
   const act=b.dataset.act;
+  if(act==='edit'){confirmEdit(a);return}
+  if(act==='lock'){unlocked.delete(id);render();toast(a.name+' locked');return}
+  if(isLocked(a)&&act!=='note'&&act!=='photo')return;
   if(act==='tick')needName(()=>{const to=a.status==='ready'?'pending':'ready';save(id,{status:to});toast(a.name+(to==='ready'?' marked complete':' set back to pending'))});
   if(act==='note')openNote(a);
-  if(act==='photo'){if(a.photo)openPhoto(a);else if(me){photoTarget=id;$('file').click()}else askName(()=>{photoTarget=id;$('file').click()})}
+  if(act==='photo'){if(a.photo)openPhoto(a);else{photoTarget=id;$('file').click()}}
 });
 $('board').addEventListener('change',e=>{if(e.target.dataset.act==='status'){const id=e.target.closest('.card').dataset.id,v=e.target.value;needName(()=>save(id,{status:v}))}});
 $('chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(c){filt=c.dataset.t;store.set('ir.filter',filt);render()}});
 $('q').addEventListener('input',e=>{q=e.target.value;render()});
-$('sf').addEventListener('change',e=>{sf=e.target.value;render()});
+const setSf=v=>{sf=v;render();window.scrollTo({top:0,behavior:'smooth'})};
+$('sf').addEventListener('click',e=>{const c=e.target.closest('[data-sf]');if(c)setSf(sf===c.dataset.sf&&c.dataset.sf?'':c.dataset.sf)});
+$('stats').addEventListener('click',e=>{const c=e.target.closest('[data-sf]');if(c)setSf(c.dataset.sf)});
+function confirmEdit(a){
+  form.innerHTML=`<h3>Edit ${esc(a.name)}?</h3><p style="margin:0">This asset is signed off as completed${a.by?' by '+esc(a.by):''}. Unlock it to change its status, photo or note. It locks again when you mark it complete or tap Lock.</p>
+  <div class="btns"><button class="btn" value="x">Cancel</button><button class="btn pri" value="ok">Unlock to edit</button></div>`;
+  dlg.returnValue='';dlg.showModal();
+  dlg.onclose=()=>{if(dlg.returnValue==='ok'){unlocked.add(a.id);render();toast(a.name+' unlocked for editing')}};
+}
 $('who').addEventListener('click',()=>askName());
 
 function openNote(a){
-  form.innerHTML=`<h3>${esc(a.name)} — note</h3><label>Remark for inspection<textarea id="nt" maxlength="500"></textarea></label>
-  <div class="btns"><button class="btn" value="x">Close</button><button class="btn pri" value="ok">Save note</button></div>`;
+  const lk=isLocked(a);
+  form.innerHTML=`<h3>${esc(a.name)} — note</h3><label>Remark for inspection${lk?' (locked — tap Edit on the card to change)':''}<textarea id="nt" maxlength="500" ${lk?'readonly':''}></textarea></label>
+  <div class="btns"><button class="btn${lk?' pri':''}" value="x">Close</button>${lk?'':'<button class="btn pri" value="ok">Save note</button>'}</div>`;
   $('nt').value=a.note||'';dlg.returnValue='';dlg.showModal();
   dlg.onclose=()=>{if(dlg.returnValue==='ok'){const v=$('nt').value.trim();if(v!==(a.note||''))needName(()=>save(a.id,{note:v}))}};
 }
 async function openPhoto(a){
   form.innerHTML=`<h3>${esc(a.name)} — photo</h3><div class="msg" id="pl">Loading photo…</div>
-  <div class="btns"><button class="btn danger" value="del">Remove</button><button class="btn" value="re">Retake</button><button class="btn pri" value="x">Close</button></div>`;
+  <div class="btns">${isLocked(a)?'':'<button class="btn danger" value="del">Remove</button><button class="btn" value="re">Retake</button>'}<button class="btn pri" value="x">Close</button></div>`;
   dlg.returnValue='';dlg.showModal();
-  form.querySelector('[value=re]').addEventListener('click',()=>{photoTarget=a.id;$('file').click()});
+  const rb=form.querySelector('[value=re]');if(rb)rb.addEventListener('click',()=>{photoTarget=a.id;$('file').click()});
   dlg.onclose=async()=>{if(dlg.returnValue!=='del')return;
     try{await apiPost({action:'unphoto',id:a.id});a.photo=false;a.photoId='';render();toast('Photo removed')}catch(e){toast('Could not remove photo')}};
   try{const j=await apiGet({action:'photo',id:a.photoId});const pl=$('pl');if(!pl)return;
@@ -370,7 +396,7 @@ async function openReport(){
      ${list.map(a=>`<tr><td class="an">${esc(a.name)}${a.tag?`<br><span class="nophoto">${esc(a.tag)}</span>`:''}</td><td><span class="pill ${esc(a.status)}">${esc(ST[a.status])}</span></td>
        <td>${esc(a.note)||'—'}</td><td>${a.at?esc(a.by||'')+'<br>'+esc(new Date(a.at).toLocaleDateString(undefined,{day:'2-digit',month:'short'})):'—'}</td>
        <td>${a.photo?`<div class="nophoto" data-ph="${esc(a.id)}">loading…</div>`:'<span class="nophoto">—</span>'}</td></tr>`).join('')}</tbody></table>`}).join('')}
-   <div class="decl">The client confirms that the assets marked <b>Ready</b> above have been inspected and the installed hardware is accepted. Any asset marked Issue, Pending or In progress is listed as an open item.<br><br>Open items / comments: ______________________________________________________________<br><br>______________________________________________________________________________</div>
+   <div class="decl">The client confirms that the assets marked <b>Completed</b> above have been inspected and the installed hardware is accepted. Any asset marked Issue, Pending or In progress is listed as an open item.<br><br>Open items / comments: ______________________________________________________________<br><br>______________________________________________________________________________</div>
    <div class="sign">
     <div><h3>Client representative</h3><p><span>Name</span></p><p><span>Designation</span></p><p><span>Signature</span></p><p><span>Date</span></p></div>
     <div><h3>Reactore representative</h3><p><span>Name</span></p><p><span>Designation</span></p><p><span>Signature</span></p><p><span>Date</span></p></div>
